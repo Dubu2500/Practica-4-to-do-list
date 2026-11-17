@@ -15,8 +15,11 @@ After=network.target
 
 [Service]
 WorkingDirectory=/opt/todo/src
+Environment=SECRET_NAME=${secret_name}
+Environment=AWS_REGION=${region}
 ExecStart=/opt/todo/venv/bin/python main.py
 Restart=always
+RestartSec=10
 
 [Install]
 WantedBy=multi-user.target

@@ -1,13 +1,51 @@
 from flask import Flask, request, jsonify
+import boto3, json, os
+import psycopg2
 
 app = Flask(__name__)
 
-tasks = []
+REGION = os.environ.get("AWS_REGION", "us-east-1")
+SECRET_NAME = os.environ.get("SECRET_NAME", "todo/db-credentials")
+
+
+def get_db_credentials():
+    client = boto3.client("secretsmanager", region_name=REGION)
+    response = client.get_secret_value(SecretId=SECRET_NAME)
+    return json.loads(response["SecretString"])
+
+
+def get_db_connection():
+    creds = get_db_credentials()
+    return psycopg2.connect(
+        host=creds["host"],
+        port=creds["port"],
+        dbname=creds["dbname"],
+        user=creds["username"],
+        password=creds["password"],
+    )
+
+
+def create_table():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "CREATE TABLE IF NOT EXISTS tasks (id SERIAL PRIMARY KEY, title TEXT NOT NULL, done BOOLEAN DEFAULT FALSE)"
+    )
+    conn.commit()
+    cur.close()
+    conn.close()
 
 
 @app.route("/tasks", methods=["GET"])
 def get_tasks():
-    return jsonify(tasks)
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute("SELECT id, title, done FROM tasks ORDER BY id")
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+
+    return jsonify([{"id": r[0], "title": r[1], "done": r[2]} for r in rows])
 
 
 @app.route("/tasks", methods=["POST"])
@@ -16,14 +54,20 @@ def create_task():
     if not data or "title" not in data:
         return jsonify({"error": "el campo title es requerido"}), 400
 
-    task = {
-        "id": len(tasks) + 1,
-        "title": data["title"],
-        "done": data.get("done", False),
-    }
-    tasks.append(task)
-    return jsonify(task), 201
+    conn = get_db_connection()
+    cur = conn.cursor()
+    cur.execute(
+        "INSERT INTO tasks (title, done) VALUES (%s, %s) RETURNING id",
+        (data["title"], data.get("done", False)),
+    )
+    task_id = cur.fetchone()[0]
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return jsonify({"id": task_id, "title": data["title"], "done": data.get("done", False)}), 201
 
 
 if __name__ == "__main__":
+    create_table()
     app.run(host="0.0.0.0", port=8000)

@@ -10,6 +10,12 @@ variable "repo_url" {
   default     = "https://github.com/Dubu2500/Practica-4-to-do-list.git"
 }
 
+variable "secret_name" {
+  type        = string
+  description = "Nombre del secret con las credenciales de RDS"
+  default     = "todo/db-credentials"
+}
+
 variable "public_key" {
   type        = string
   description = "Llave publica SSH para el key pair (contenido de todo-key.pub)"
