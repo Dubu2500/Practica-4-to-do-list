@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify
+from datetime import datetime, timezone
 import boto3, json, os
 import psycopg2
 
@@ -6,6 +7,7 @@ app = Flask(__name__)
 
 REGION = os.environ.get("AWS_REGION", "us-east-1")
 SECRET_NAME = os.environ.get("SECRET_NAME", "todo/db-credentials")
+APP_VERSION = os.environ.get("APP_VERSION", "dev")
 
 
 def get_db_credentials():
@@ -66,6 +68,30 @@ def create_task():
     conn.close()
 
     return jsonify({"id": task_id, "title": data["title"], "done": data.get("done", False)}), 201
+
+
+@app.route("/version", methods=["GET"])
+def get_version():
+    return jsonify({"version": APP_VERSION})
+
+
+@app.route("/health", methods=["GET"])
+def health():
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT 1")
+        cur.close()
+        conn.close()
+        db = "OK"
+    except Exception:
+        db = "FAIL"
+
+    return jsonify({
+        "database": db,
+        "version": APP_VERSION,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }), 200 if db == "OK" else 503
 
 
 if __name__ == "__main__":
