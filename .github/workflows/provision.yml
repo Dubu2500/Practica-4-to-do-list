@@ -1,0 +1,47 @@
+name: Provision infrastructure
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: aws-infra
+  cancel-in-progress: false
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: terraform
+    env:
+      TF_VAR_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
+      TFSTATE_BUCKET: todo-list-tfstate-dubu2500
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: us-east-1
+      - name: verificar credenciales AWS
+        run: |
+          aws sts get-caller-identity || {
+            echo "::error::Credenciales invalidas o expiradas. Actualiza los 3 secrets del learner lab."
+            exit 1
+          }
+      - name: crear bucket del tfstate si no existe
+        run: |
+          aws s3api head-bucket --bucket "$TFSTATE_BUCKET" 2>/dev/null || \
+            aws s3 mb "s3://$TFSTATE_BUCKET" --region us-east-1
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+      - run: terraform init -input=false
+      - run: terraform plan -input=false -out=tfplan
+      - run: terraform apply -input=false tfplan
+      - name: mostrar IP de la EC2
+        run: |
+          IP=$(terraform output -raw ec2_public_ip)
+          echo "IP de la EC2: $IP"
+          echo "### IP de la EC2: \`$IP\` (actualiza el secret EC2_HOST)" >> "$GITHUB_STEP_SUMMARY"

@@ -9,6 +9,12 @@ terraform {
       version = "~> 3.0"
     }
   }
+
+  backend "s3" {
+    bucket = "todo-list-tfstate-dubu2500"
+    key    = "todo/terraform.tfstate"
+    region = "us-east-1"
+  }
 }
 
 provider "aws" {
