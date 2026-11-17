@@ -1,0 +1,21 @@
+name: Release
+on:
+  push:
+    tags:
+      - "v*.*.*"
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: comprimir repositorio
+        run: git archive --format=zip -o "to-do-list-api-${GITHUB_REF_NAME}.zip" HEAD
+      - name: crear release
+        env:
+          # con GITHUB_TOKEN el release no dispara el workflow de deploy
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "to-do-list-api-${GITHUB_REF_NAME}.zip" \
+            --title "$GITHUB_REF_NAME" --generate-notes
