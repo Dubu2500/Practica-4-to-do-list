@@ -1,0 +1,19 @@
+name: Health check
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    steps:
+      - name: revisar /health
+        run: |
+          RESPUESTA=$(curl -s --max-time 10 "http://${{ secrets.EC2_HOST }}:8000/health" || true)
+          echo "$RESPUESTA"
+          echo "$RESPUESTA" | grep -q '"database": *"OK"' || {
+            echo "::error::La API no esta sana"
+            exit 1
+          }
