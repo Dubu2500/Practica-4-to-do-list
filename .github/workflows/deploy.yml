@@ -1,0 +1,42 @@
+name: Deploy
+on:
+  release:
+    types: [published]
+permissions:
+  contents: read
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.release.tag_name }}
+      EC2_HOST: ${{ secrets.EC2_HOST }}
+    steps:
+      - name: preparar llave ssh
+        run: |
+          echo "${{ secrets.EC2_SSH_KEY }}" > key.pem
+          chmod 400 key.pem
+      - name: descargar release en la EC2 y reiniciar
+        run: |
+          ssh -i key.pem -o StrictHostKeyChecking=no ubuntu@"$EC2_HOST" bash -s <<EOF
+          set -e
+          rm -rf /tmp/release && mkdir /tmp/release && cd /tmp/release
+          curl -sL -o app.zip https://github.com/${{ github.repository }}/releases/download/$TAG/to-do-list-api-$TAG.zip
+          python3 -m zipfile -e app.zip .
+
+          sudo rm -rf /opt/todo/src
+          sudo cp -r src /opt/todo/src
+          sudo /opt/todo/venv/bin/pip install -q -r /opt/todo/src/requirements.txt
+
+          sudo mkdir -p /etc/systemd/system/todo.service.d
+          printf '[Service]\nEnvironment=APP_VERSION=$TAG\n' | sudo tee /etc/systemd/system/todo.service.d/version.conf
+          sudo systemctl daemon-reload
+          sudo systemctl restart todo
+          EOF
+      - name: verificar version desplegada
+        run: |
+          for i in 1 2 3 4 5 6; do
+            sleep 5
+            curl -s "http://$EC2_HOST:8000/version" && exit 0
+          done
+          echo "::error::La API no respondio despues del deploy"
+          exit 1
