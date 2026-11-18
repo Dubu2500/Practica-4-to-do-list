@@ -8,6 +8,18 @@ app = Flask(__name__)
 REGION = os.environ.get("AWS_REGION", "us-east-1")
 SECRET_NAME = os.environ.get("SECRET_NAME", "todo/db-credentials")
 APP_VERSION = os.environ.get("APP_VERSION", "dev")
+NAMESPACE = "TodoListApi"
+
+
+def put_metric(name, value=1):
+    try:
+        cloudwatch = boto3.client("cloudwatch", region_name=REGION)
+        cloudwatch.put_metric_data(
+            Namespace=NAMESPACE,
+            MetricData=[{"MetricName": name, "Value": value, "Unit": "Count"}],
+        )
+    except Exception as e:
+        print(f"no se pudo enviar la metrica {name}: {e}")
 
 
 def get_db_credentials():
@@ -24,6 +36,7 @@ def get_db_connection():
         dbname=creds["dbname"],
         user=creds["username"],
         password=creds["password"],
+        connect_timeout=5,
     )
 
 
@@ -40,12 +53,16 @@ def create_table():
 
 @app.route("/tasks", methods=["GET"])
 def get_tasks():
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute("SELECT id, title, done FROM tasks ORDER BY id")
-    rows = cur.fetchall()
-    cur.close()
-    conn.close()
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute("SELECT id, title, done FROM tasks ORDER BY id")
+        rows = cur.fetchall()
+        cur.close()
+        conn.close()
+    except Exception:
+        put_metric("DBErrors")
+        return jsonify({"error": "no se pudo leer de la base de datos"}), 500
 
     return jsonify([{"id": r[0], "title": r[1], "done": r[2]} for r in rows])
 
@@ -56,17 +73,22 @@ def create_task():
     if not data or "title" not in data:
         return jsonify({"error": "el campo title es requerido"}), 400
 
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute(
-        "INSERT INTO tasks (title, done) VALUES (%s, %s) RETURNING id",
-        (data["title"], data.get("done", False)),
-    )
-    task_id = cur.fetchone()[0]
-    conn.commit()
-    cur.close()
-    conn.close()
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(
+            "INSERT INTO tasks (title, done) VALUES (%s, %s) RETURNING id",
+            (data["title"], data.get("done", False)),
+        )
+        task_id = cur.fetchone()[0]
+        conn.commit()
+        cur.close()
+        conn.close()
+    except Exception:
+        put_metric("DBErrors")
+        return jsonify({"error": "no se pudo escribir en la base de datos"}), 500
 
+    put_metric("TasksCreated")
     return jsonify({"id": task_id, "title": data["title"], "done": data.get("done", False)}), 201
 
 
@@ -85,6 +107,7 @@ def health():
         conn.close()
         db = "OK"
     except Exception:
+        put_metric("DBErrors")
         db = "FAIL"
 
     return jsonify({

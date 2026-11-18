@@ -1,0 +1,31 @@
+{
+  "widgets": [
+    {
+      "type": "metric", "x": 0, "y": 0, "width": 8, "height": 6,
+      "properties": {
+        "title": "CPU de la EC2 (%)",
+        "region": "${REGION}", "view": "timeSeries", "stat": "Average", "period": 300,
+        "metrics": [["AWS/EC2", "CPUUtilization", "InstanceId", "${INSTANCE_ID}"]],
+        "annotations": { "horizontal": [{ "label": "Alarma", "value": 80 }] }
+      }
+    },
+    {
+      "type": "metric", "x": 8, "y": 0, "width": 8, "height": 6,
+      "properties": {
+        "title": "Errores de base de datos",
+        "region": "${REGION}", "view": "timeSeries", "stat": "Sum", "period": 60,
+        "metrics": [["TodoListApi", "DBErrors", { "color": "#d62728" }]],
+        "annotations": { "horizontal": [{ "label": "Alarma", "value": 1 }] }
+      }
+    },
+    {
+      "type": "metric", "x": 16, "y": 0, "width": 8, "height": 6,
+      "properties": {
+        "title": "Tareas creadas",
+        "region": "${REGION}", "view": "timeSeries", "stat": "Sum", "period": 300,
+        "metrics": [["TodoListApi", "TasksCreated"]],
+        "annotations": { "horizontal": [{ "label": "Alarma", "value": 50 }] }
+      }
+    }
+  ]
+}

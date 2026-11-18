@@ -1,0 +1,42 @@
+[
+  {
+    "AlarmName": "todo-ec2-cpu-alta",
+    "AlarmDescription": "La CPU de la EC2 estuvo arriba de 80% durante 10 minutos",
+    "Namespace": "AWS/EC2",
+    "MetricName": "CPUUtilization",
+    "Dimensions": [{ "Name": "InstanceId", "Value": "${INSTANCE_ID}" }],
+    "Statistic": "Average",
+    "Period": 300,
+    "EvaluationPeriods": 2,
+    "Threshold": 80,
+    "ComparisonOperator": "GreaterThanThreshold",
+    "TreatMissingData": "notBreaching",
+    "AlarmActions": ["${TOPIC_ARN}"]
+  },
+  {
+    "AlarmName": "todo-db-errores",
+    "AlarmDescription": "Hubo al menos un error al leer o escribir en RDS en el ultimo minuto",
+    "Namespace": "TodoListApi",
+    "MetricName": "DBErrors",
+    "Statistic": "Sum",
+    "Period": 60,
+    "EvaluationPeriods": 1,
+    "Threshold": 1,
+    "ComparisonOperator": "GreaterThanOrEqualToThreshold",
+    "TreatMissingData": "notBreaching",
+    "AlarmActions": ["${TOPIC_ARN}"]
+  },
+  {
+    "AlarmName": "todo-tareas-creadas-pico",
+    "AlarmDescription": "Se crearon mas de 50 tareas en 5 minutos, posible abuso o un cliente en loop",
+    "Namespace": "TodoListApi",
+    "MetricName": "TasksCreated",
+    "Statistic": "Sum",
+    "Period": 300,
+    "EvaluationPeriods": 1,
+    "Threshold": 50,
+    "ComparisonOperator": "GreaterThanThreshold",
+    "TreatMissingData": "notBreaching",
+    "AlarmActions": ["${TOPIC_ARN}"]
+  }
+]

@@ -8,6 +8,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 import main
 
 
+@pytest.fixture(autouse=True)
+def metricas(monkeypatch):
+    enviadas = []
+    monkeypatch.setattr(main, "put_metric", lambda name, value=1: enviadas.append(name))
+    return enviadas
+
+
 @pytest.fixture
 def client():
     return main.app.test_client()
@@ -22,13 +29,14 @@ def db_falsa(monkeypatch):
     return cursor
 
 
-def test_crear_tarea_regresa_201(client, db_falsa):
+def test_crear_tarea_regresa_201(client, db_falsa, metricas):
     db_falsa.fetchone.return_value = (1,)
 
     r = client.post("/tasks", json={"title": "estudiar para el examen", "done": False})
 
     assert r.status_code == 201
     assert r.get_json() == {"id": 1, "title": "estudiar para el examen", "done": False}
+    assert metricas == ["TasksCreated"]
 
 
 def test_crear_tarea_sin_title_regresa_400(client):
@@ -38,7 +46,7 @@ def test_crear_tarea_sin_title_regresa_400(client):
     assert r.get_json()["error"] == "el campo title es requerido"
 
 
-def test_health_sin_base_de_datos_regresa_fail(client, monkeypatch):
+def test_health_sin_base_de_datos_regresa_fail(client, monkeypatch, metricas):
     def falla():
         raise Exception("no hay conexion")
 
@@ -48,3 +56,4 @@ def test_health_sin_base_de_datos_regresa_fail(client, monkeypatch):
 
     assert r.status_code == 503
     assert r.get_json()["database"] == "FAIL"
+    assert metricas == ["DBErrors"]
